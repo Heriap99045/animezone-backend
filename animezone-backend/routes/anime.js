@@ -5,11 +5,11 @@ import {
   getSeasonalAnime,
   getTopAnime,
   getAnimeByGenre,
-} from "../services/jikan.js";
+} from "../services/anilist.js";
 
 const router = Router();
 
-// Bentuk ulang data mentah Jikan menjadi bentuk ringkas yang dipakai frontend
+// Bentuk ulang data mentah AniList (sudah disamakan formatnya) jadi bentuk ringkas untuk frontend
 function simplify(item) {
   return {
     id: item.mal_id,
@@ -23,7 +23,7 @@ function simplify(item) {
     image: item.images?.jpg?.large_image_url || item.images?.jpg?.image_url,
     url: item.url, // tautan resmi ke halaman MyAnimeList (bukan streaming)
     // Tautan platform streaming legal — hanya terisi lengkap saat memanggil
-    // endpoint detail (/api/anime/:id), karena butuh data "full" dari Jikan.
+    // endpoint detail (/api/anime/:id).
     streaming: (item.streaming || []).map((s) => ({ name: s.name, url: s.url })),
   };
 }
@@ -89,8 +89,8 @@ function handleError(res, err) {
   console.error("[ANIMEZONE API error]", err.message);
   res.status(rateLimited ? 429 : 502).json({
     error: rateLimited
-      ? "Terlalu banyak permintaan ke Jikan API, coba lagi sebentar lagi."
-      : "Gagal mengambil data dari Jikan API.",
+      ? "Terlalu banyak permintaan ke AniList API, coba lagi sebentar lagi."
+      : "Gagal mengambil data dari AniList API.",
   });
 }
 
