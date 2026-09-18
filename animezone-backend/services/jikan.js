@@ -24,19 +24,29 @@ async function jikanFetch(path, cacheKey, ttlMs) {
   const cached = getCache(cacheKey);
   if (cached) return { ...cached, fromCache: true };
 
-  const data = await enqueue(async () => {
-    const res = await fetch(`${BASE_URL}${path}`);
-    if (!res.ok) {
-      if (res.status === 429) {
-        throw new Error("RATE_LIMITED");
-      }
-      throw new Error(`Jikan API error: ${res.status}`);
-    }
-    return res.json();
-  });
+  const data = await enqueue(async () => fetchWithRetry(path));
 
   setCache(cacheKey, data, ttlMs);
   return { ...data, fromCache: false };
+}
+
+// Jikan (API gratis pihak ketiga) kadang timeout sesaat (504) meski jaringan kita normal.
+// Kita coba ulang beberapa kali dengan jeda yang makin panjang sebelum benar-benar menyerah.
+async function fetchWithRetry(path, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+  const res = await fetch(`${BASE_URL}${path}`, { signal: AbortSignal.timeout(15000) });
+
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("RATE_LIMITED");
+
+    const isTransient = res.status === 502 || res.status === 503 || res.status === 504;
+    if (isTransient && attempt < MAX_ATTEMPTS) {
+      await new Promise((r) => setTimeout(r, attempt * 1000)); // 1s, lalu 2s
+      return fetchWithRetry(path, attempt + 1);
+    }
+    throw new Error(`Jikan API error: ${res.status}`);
+  }
+  return res.json();
 }
 
 /** Cari anime berdasarkan judul/kata kunci. */
